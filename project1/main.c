@@ -1,7 +1,3 @@
-#include <stdio.h> // printf
-
-
-
 //func prototypes to be included in /usr/src/include/unistd.h
 
 /*
@@ -42,7 +38,7 @@ int get_plog_byindex(int index, long * c_time, long * t_time);
 enum {STOP_PLOG = 0, START_PLOG = 1, RESET_PLOG = 2, GET_PLOG_SIZE = 3, GET_PLOG_BYINDX = 4, GET_PLOG_BYPID = 5};
 
 #define plog_cmd    m2_i1 
-#define plog_num    m2_i2
+#define plog_int    m2_i2
 #define plog_ctime  m2_l1
 #define plog_ttime  m2_l2
 
@@ -53,16 +49,31 @@ enum {STOP_PLOG = 0, START_PLOG = 1, RESET_PLOG = 2, GET_PLOG_SIZE = 3, GET_PLOG
 int get_plog_byindex(int index, long * c_time, long * t_time){
     message m;
     m.plog_cmd = GET_PLOG_BYINDX;
-    m.plog_num = index;
+    m.plog_int = index;
     _syscall(PM_PROC_NR, PLOG, &m);
     *c_time = m.plog_ctime;
     *t_time = m.plog_ttime;
     return 8;
 }
 
-int main(int argc, char * argv[]){
-    printf("hello world\n");
-    long c_time, t_time;
+
+int get_plog_size() {
+    message m;
+    m.plog_cmd = GET_PLOG_SIZE;
+    _syscall(PM_PROC_NR, PLOG, &m);
+    return m.plog_int;
+} 
+#include <stdio.h> // printf
+
+void test_plog_index(int index) {
+    printf("testing get_plog_byindex with index = %d\n", index);
+    long c_time = -1, t_time = -1;
     get_plog_byindex(3,&c_time,&t_time);
+    printf("c_time = %ld\nt_time = %ld\n", c_time, t_time);
+}
+
+int main(int argc, char * argv[]){
+    test_plog_index(3);
+    printf("Plog size is: %d\n", get_plog_size());
     return 0;
 }
