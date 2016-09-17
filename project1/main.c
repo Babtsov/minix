@@ -61,6 +61,8 @@ int get_plog_byindex(int index, long * c_time, long * t_time){
 }
 
 int main(int argc, char * argv[]){
-    printf("hello world");
+    printf("hello world\n");
+    long c_time, t_time;
+    get_plog_byindex(3,&c_time,&t_time);
     return 0;
 }
