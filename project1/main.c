@@ -46,6 +46,41 @@ enum {STOP_PLOG = 0, START_PLOG = 1, RESET_PLOG = 2, GET_PLOG_SIZE = 3, GET_PLOG
 
 #include <lib.h> // _syscall & message
 
+void stop_plog() {
+    message m;
+    m.plog_cmd = STOP_PLOG;
+    _syscall(PM_PROC_NR, PLOG, &m);
+} 
+
+void start_plog() {
+    message m;
+    m.plog_cmd = START_PLOG;
+    _syscall(PM_PROC_NR, PLOG, &m);
+}
+
+void reset_plog() {
+    message m;
+    m.plog_cmd = RESET_PLOG;
+    _syscall(PM_PROC_NR, PLOG, &m);
+}
+
+int get_plog_size() {
+    message m;
+    m.plog_cmd = GET_PLOG_SIZE;
+    _syscall(PM_PROC_NR, PLOG, &m);
+    return m.plog_int;
+}
+
+int get_plog_byPID(int pid, long * c_time, long * t_time){
+    message m;
+    m.plog_cmd = GET_PLOG_BYPID;
+    m.plog_int = pid;
+    _syscall(PM_PROC_NR, PLOG, &m);
+    *c_time = m.plog_ctime;
+    *t_time = m.plog_ttime;
+    return 8;
+}
+
 int get_plog_byindex(int index, long * c_time, long * t_time){
     message m;
     m.plog_cmd = GET_PLOG_BYINDX;
@@ -56,24 +91,28 @@ int get_plog_byindex(int index, long * c_time, long * t_time){
     return 8;
 }
 
-
-int get_plog_size() {
-    message m;
-    m.plog_cmd = GET_PLOG_SIZE;
-    _syscall(PM_PROC_NR, PLOG, &m);
-    return m.plog_int;
-} 
 #include <stdio.h> // printf
+
+void test_plog_pid(int pid) {
+    printf("testing get_plog_byPID with pid = %d\n", pid);
+    long c_time = -1, t_time = -1;
+    get_plog_byPID(pid,&c_time,&t_time);
+    printf("c_time = %ld\nt_time = %ld\n\n", c_time, t_time);
+}
 
 void test_plog_index(int index) {
     printf("testing get_plog_byindex with index = %d\n", index);
     long c_time = -1, t_time = -1;
-    get_plog_byindex(3,&c_time,&t_time);
-    printf("c_time = %ld\nt_time = %ld\n", c_time, t_time);
+    get_plog_byindex(index,&c_time,&t_time);
+    printf("c_time = %ld\nt_time = %ld\n\n", c_time, t_time);
 }
 
 int main(int argc, char * argv[]){
+    start_plog();
+    test_plog_pid(23);
     test_plog_index(3);
     printf("Plog size is: %d\n", get_plog_size());
+    reset_plog();
+    stop_plog();
     return 0;
 }
