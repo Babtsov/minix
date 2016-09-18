@@ -97,7 +97,7 @@ EXTERN struct mproc {
 
 #define PLOG_MAX_TABLE_SIZE     1024
 
-EXTERN struct plog_table {
+struct plog_table {
         bool enabled;
         int table_size;
         int current_indx;

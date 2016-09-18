@@ -27,36 +27,35 @@ int do_plog(void) {
         case STOP_PLOG:
             printf("plog was called with STOP_PLOG\n");
             plog_table.enabled = false;
-            break;
+            return 0;
 
         case START_PLOG:
             printf("plog was called with START_PLOG\n");
             plog_table.enabled = true;
-            break;
+            return 0;
 
         case RESET_PLOG:
             printf("plog was called with RESET_PLOG\n");
             plog_table.current_indx = 0;
             plog_table.table_size = 0;
-            break;
+            return 0;
 
         case GET_PLOG_SIZE:
             printf("plog was called with GET_PLOG_SIZE\n");
             mp->mp_reply.plog_int = PLOG_MAX_TABLE_SIZE;
-            break;
+            return 0;
 
         case GET_PLOG_BYINDX:
             printf("plog was called with GET_PLOG_BYINDX\n");
             int index = m_in.plog_int;
-            /* Verify that the requested index is actually within the allowed 
-             * range and that it actually stores valid data (and not garbage)
-             */
-            if (index < 0 || index > PLOG_MAX_TABLE_SIZE - 1 
-                || (plog_table.table_size < PLOG_MAX_TABLE_SIZE && index >= plog_table.current_indx) ) {
+            if (index < 0 || index > PLOG_MAX_TABLE_SIZE - 1) { 
                return -3;
             } 
             mp->mp_reply.plog_ctime = plog_table.content[index].c_time;
             mp->mp_reply.plog_ttime = plog_table.content[index].t_time;
+            if (plog_table.table_size < PLOG_MAX_TABLE_SIZE && index >= plog_table.current_indx) {
+                return -2;
+            }
             return 0;
 
         case GET_PLOG_BYPID:
@@ -67,7 +66,6 @@ int do_plog(void) {
             mp->mp_reply.plog_ctime = cell->c_time;
             mp->mp_reply.plog_ttime = cell->t_time;
             return 0;
-
     } 
-    return 0;
+    return -1;
 }

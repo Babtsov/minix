@@ -112,11 +112,16 @@ int do_fork()
   /* Find a free pid for the child and put it in the table. */
   new_pid = get_free_pid();
   rmc->mp_pid = new_pid;	/* assign pid to child */
-  struct plog_cell cell = {new_pid, get_time(), 100};
-  int indx = plog_table.current_indx;
-  plog_table.content[indx] = cell;
-  indx = (indx + 1) % PLOG_MAX_TABLE_SIZE; 
-  plog_table.current_indx = indx;
+  
+  /* Start recording time for the new child */  
+  if (plog_table.enabled) {
+      struct plog_cell cell = {new_pid, get_time(), 0};
+      int indx = plog_table.current_indx;
+      plog_table.content[indx] = cell;
+      indx = (indx + 1) % PLOG_MAX_TABLE_SIZE; 
+      plog_table.current_indx = indx;
+  }
+
   m.m_type = PM_FORK;
   m.PM_PROC = rmc->mp_endpoint;
   m.PM_PPROC = rmp->mp_endpoint;
