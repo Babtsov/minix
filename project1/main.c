@@ -35,63 +35,10 @@ int get_plog_byPID(int pid, long * c_time, long * t_time);
  */
 int get_plog_byindex(int index, long * c_time, long * t_time);
 
-enum {STOP_PLOG = 0, START_PLOG = 1, RESET_PLOG = 2, GET_PLOG_SIZE = 3, GET_PLOG_BYINDX = 4, GET_PLOG_BYPID = 5};
-
-#define plog_cmd    m2_i1 
-#define plog_int    m2_i2
-#define plog_ctime  m2_l1
-#define plog_ttime  m2_l2
-
-// put impl in /usr/src/lib/libc/sys-minix/
-
-#include <lib.h> // _syscall & message
-
-void stop_plog() {
-    message m;
-    m.plog_cmd = STOP_PLOG;
-    _syscall(PM_PROC_NR, PLOG, &m);
-} 
-
-void start_plog() {
-    message m;
-    m.plog_cmd = START_PLOG;
-    _syscall(PM_PROC_NR, PLOG, &m);
-}
-
-void reset_plog() {
-    message m;
-    m.plog_cmd = RESET_PLOG;
-    _syscall(PM_PROC_NR, PLOG, &m);
-}
-
-int get_plog_size() {
-    message m;
-    m.plog_cmd = GET_PLOG_SIZE;
-    _syscall(PM_PROC_NR, PLOG, &m);
-    return m.plog_int;
-}
-
-int get_plog_byPID(int pid, long * c_time, long * t_time){
-    message m;
-    m.plog_cmd = GET_PLOG_BYPID;
-    m.plog_int = pid;
-    _syscall(PM_PROC_NR, PLOG, &m);
-    *c_time = m.plog_ctime;
-    *t_time = m.plog_ttime;
-    return 8;
-}
-
-int get_plog_byindex(int index, long * c_time, long * t_time){
-    message m;
-    m.plog_cmd = GET_PLOG_BYINDX;
-    m.plog_int = index;
-    _syscall(PM_PROC_NR, PLOG, &m);
-    *c_time = m.plog_ctime;
-    *t_time = m.plog_ttime;
-    return 8;
-}
-
+/************************************************************************************************/
 #include <stdio.h> // printf
+#include <stdlib.h>
+#include "plog.h"
 
 void test_plog_pid(int pid) {
     printf("testing get_plog_byPID with pid = %d\n", pid);
@@ -110,9 +57,9 @@ void test_plog_index(int index) {
 int main(int argc, char * argv[]){
   //  start_plog();
   //  test_plog_pid(23);
-    test_plog_index(3);
-    printf("Plog size is: %d\n", get_plog_size());
-   // reset_plog();
-   // stop_plog();
+  // printf("Plog size is: %d\n", get_plog_size());
+	test_plog_index(123);
+  // reset_plog();
+  // stop_plog();
     return 0;
 }
