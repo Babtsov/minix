@@ -37,7 +37,7 @@ static void tell_parent(struct mproc *child);
 static void tell_tracer(struct mproc *child);
 static void tracer_died(struct mproc *child);
 static void cleanup(register struct mproc *rmp);
-
+static long get_time(void);
 /*===========================================================================*
  *				do_fork					     *
  *===========================================================================*/
@@ -112,14 +112,15 @@ int do_fork()
   /* Find a free pid for the child and put it in the table. */
   new_pid = get_free_pid();
   rmc->mp_pid = new_pid;	/* assign pid to child */
-
+  struct plog_cell cell = {new_pid, get_time(), 0};
+  plog_table.content[plog_table.current_indx] = cell; 
+  plog_table.current_indx++;
   m.m_type = PM_FORK;
   m.PM_PROC = rmc->mp_endpoint;
   m.PM_PPROC = rmp->mp_endpoint;
   m.PM_CPID = rmc->mp_pid;
   m.PM_REUID = -1;	/* Not used by PM_FORK */
   m.PM_REGID = -1;	/* Not used by PM_FORK */
-
   tell_vfs(rmc, &m);
 
 #if USE_TRACE
@@ -712,6 +713,17 @@ struct mproc *child;			/* process being traced */
   }
 }
 #endif /* USE_TRACE */
+
+/*===========================================================================*
+ *				get_time					     *
+ *===========================================================================*/
+static long get_time(void) {
+    clock_t uptime, boottime;
+    int s;
+    if ( (s=getuptime2(&uptime, &boottime)) != OK) 
+        panic("do_time couldn't get uptime: %d", s); 
+    return boottime + (uptime/system_hz);
+}
 
 /*===========================================================================*
  *				cleanup					     *

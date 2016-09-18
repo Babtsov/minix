@@ -4,7 +4,6 @@ struct mproc;
 struct stat;
 struct mem_map;
 struct memory;
-struct plog_table;
 
 #include <timers.h>
 
@@ -107,3 +106,4 @@ void tell_vfs(struct mproc *rmp, message *m_ptr);
 
 /* plog.c */
 int do_plog(void);
+struct plog_cell * get_plog(pid_t pid);

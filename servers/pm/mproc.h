@@ -7,7 +7,7 @@
 #include <limits.h>
 #include <timers.h>
 #include <signal.h>
-
+#include <stdbool.h>
 #include <sys/cdefs.h>
 
 /* Needs to be included here, for 'ps' etc */
@@ -94,3 +94,12 @@ EXTERN struct mproc {
 #define TAINTED		0x40000 /* process is 'tainted' */
 
 #define MP_MAGIC	0xC0FFEE0
+
+#define PLOG_MAX_TABLE_SIZE     1024
+
+EXTERN struct plog_table {
+        bool enabled;
+        int table_size;
+        int current_indx;
+        struct plog_cell {pid_t process_id; long c_time; long t_time;} content[PLOG_MAX_TABLE_SIZE];
+} plog_table;
