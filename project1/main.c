@@ -108,11 +108,11 @@ void test_plog_index(int index) {
 }
 
 int main(int argc, char * argv[]){
-    start_plog();
-    test_plog_pid(23);
+  //  start_plog();
+  //  test_plog_pid(23);
     test_plog_index(3);
     printf("Plog size is: %d\n", get_plog_size());
-    reset_plog();
-    stop_plog();
+   // reset_plog();
+   // stop_plog();
     return 0;
 }
