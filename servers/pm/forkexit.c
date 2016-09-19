@@ -115,11 +115,14 @@ int do_fork()
   
   /* Start recording time for the new child */  
   if (plog_table.enabled) {
+      printf("@@@FORK while recording! PID: %d| plog index = %d.\n", new_pid, plog_table.current_indx);
       struct plog_cell cell = {new_pid, get_time(), 0};
       int indx = plog_table.current_indx;
       plog_table.content[indx] = cell;
       indx = (indx + 1) % PLOG_MAX_TABLE_SIZE; 
       plog_table.current_indx = indx;
+      if (plog_table.table_size < PLOG_MAX_TABLE_SIZE) 
+          plog_table.table_size++;
   }
 
   m.m_type = PM_FORK;
@@ -301,6 +304,18 @@ int dump_core;			/* flag indicating whether to dump core */
   p_mp = &mproc[rmp->mp_parent];			/* process' parent */
   p_mp->mp_child_utime += user_time + rmp->mp_child_utime; /* add user time */
   p_mp->mp_child_stime += sys_time + rmp->mp_child_stime; /* add system time */
+  
+  /* grab termination time for plog */ 
+  if (plog_table.enabled) {
+    printf("@@@EXIT while recording! PID: %d| ",rmp->mp_pid);
+    struct plog_cell * cell = get_plog(rmp->mp_pid);
+    if (cell) {                     /* if the process' starting time got recorded */
+        printf("found in plog. recording...\n");
+        cell->t_time = get_time();  /* record also its termination time */
+    }
+    else 
+        printf("not found in plog!~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n");
+  }
 
   /* Tell the kernel the process is no longer runnable to prevent it from 
    * being scheduled in between the following steps. Then tell VFS that it 
