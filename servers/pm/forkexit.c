@@ -312,9 +312,9 @@ int dump_core;			/* flag indicating whether to dump core */
     if (cell) {                     /* if the process' starting time got recorded */
         printf("found in plog. recording...\n");
         cell->t_time = get_time();  /* record also its termination time */
+    } else {
+        printf("not found in plog!~~~~~~~~~~~~~~~~~~~~~~~~~~~\n");
     }
-    else 
-        printf("not found in plog!~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n");
   }
 
   /* Tell the kernel the process is no longer runnable to prevent it from 
