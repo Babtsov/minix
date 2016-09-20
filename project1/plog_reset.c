@@ -1,4 +1,4 @@
-#include "plog.h"
+#include <unistd.h>
 
 int main(){
     reset_plog();

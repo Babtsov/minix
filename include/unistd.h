@@ -147,6 +147,15 @@ int	 unlink(const char *);
 ssize_t	 write(int, const void *, size_t);
 
 
+/* plog functions */
+void stop_plog(void); 
+void start_plog(void); 
+void reset_plog(void); 
+int get_plog_size(void); 
+int get_plog_byPID(int pid, long * c_time, long * t_time);
+int get_plog_byindex(int index, long * c_time, long * t_time);
+
+
 /*
  * IEEE Std 1003.2-92, adopted in X/Open Portability Guide Issue 4 and later
  */
