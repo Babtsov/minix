@@ -13,7 +13,6 @@ enum {STOP_PLOG = 0, START_PLOG = 1, RESET_PLOG = 2, GET_PLOG_SIZE = 3, GET_PLOG
 
 struct plog_cell * get_plog(pid_t process_id) {
     if (process_id < 0) {
-        printf("process_id = %d is invalid!\n", process_id);
         return NULL;
     } 
     for (int i = 0; i < plog_table.table_size; i++) {
@@ -60,8 +59,6 @@ int do_plog(void) {
             }
             mp->mp_reply.plog_ctime = plog_table.content[index].c_time;
             mp->mp_reply.plog_ttime = plog_table.content[index].t_time;
-//            if (plog_table.table_size < PLOG_MAX_TABLE_SIZE && index >= plog_table.current_indx)
-//                return 2; 
             return 0;
 
         case GET_PLOG_BYPID:

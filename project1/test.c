@@ -38,7 +38,7 @@ void test_get_plog_by_invalid_index(void) {
     
     // assert
     if (status_for_too_large == 3 && status_for_neg == 3 
-          /*  && c_time == 345 && t_time == 356*/) {
+            && c_time == 345 && t_time == 356) {
         printf(ECHO_SUCCESS);
     } else {
         printf(ECHO_OOPS);
@@ -68,7 +68,7 @@ void test_get_plog_by_valid_pid(void) {
         int status = get_plog_byPID(children[i], &c_time, &t_time);
         
         // assert
-        if (c_time == current_time && t_time >= current_time + sleep_times[i] /* && status == 0*/ ) {
+        if (c_time == current_time && t_time >= current_time + sleep_times[i]  && status == 0) {
             printf("Case %d/%d (slept for %d seconds) " ECHO_SUCCESS ,i + 1, N, sleep_times[i]);
         } else {
             printf(ECHO_OOPS);

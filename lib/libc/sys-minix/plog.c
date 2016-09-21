@@ -1,7 +1,5 @@
-/* plog lib calls implementation */
-
-#include <lib.h> // _syscall & message
-#include <unistd.h>
+#include <lib.h>    // _syscall & message
+#include <unistd.h> // plog function prototypes
 
 #define plog_cmd    m2_i1 
 #define plog_int    m2_i2
@@ -39,18 +37,22 @@ int get_plog_byPID(int pid, long * c_time, long * t_time){
     message m;
     m.plog_cmd = GET_PLOG_BYPID;
     m.plog_int = pid;
-    _syscall(PM_PROC_NR, PLOG, &m);
-    *c_time = m.plog_ctime;
-    *t_time = m.plog_ttime;
-    return 8;
+    int status = _syscall(PM_PROC_NR, PLOG, &m);
+    if (status == 0) {
+        *c_time = m.plog_ctime;
+        *t_time = m.plog_ttime;
+    }
+    return status;
 }
 
 int get_plog_byindex(int index, long * c_time, long * t_time){
     message m;
     m.plog_cmd = GET_PLOG_BYINDX;
     m.plog_int = index;
-    int valid = _syscall(PM_PROC_NR, PLOG, &m);
-    *c_time = m.plog_ctime;
-    *t_time = m.plog_ttime;
-   return valid;
+    int status = _syscall(PM_PROC_NR, PLOG, &m);
+    if (status == 0) {
+        *c_time = m.plog_ctime;
+        *t_time = m.plog_ttime;
+    }
+   return status;
 }
