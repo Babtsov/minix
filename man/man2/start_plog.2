@@ -1,0 +1,24 @@
+.\" Plog documentation
+.TH Plog 2
+.UC
+.SH NAME
+Plog \- start_plog, stop_plog, reset_plog - process logging starting and termination time utility.
+.SH SYNOPSIS
+#include <unistd.h>
+
+void stop_plog();
+void start_plog();
+void reset_plog();
+
+.SH DESCRIPTION
+The utility allows the user to obtain information about starting and ending time of the various processes in the system. The information is stored in a buffer and allows the user to query starting and ending time based on the index to the plog table or based on the pid. The functionality also allows the user to enable and disable the tracking of process creation and termination time dynamically.
+The stop_plog and start_plog functions allow the user to stop or start the logging of creation and termination time of all the generated processes in the OS.   
+reset_plog allows the user to clear all the data that was previously stored in the plog circular buffer. 
+.SH OPTIONS
+No options for these functions
+.SH SEE ALSO        
+get_plog_size (2), get_plog_byPID (2), get_plog_byindex (2)
+.SH BUGS            
+No known bugs have been reported.
+.SH AUTHOR    
+Benjamin Babtsov (ben.babtsov@ufl.edu)
