@@ -54,11 +54,14 @@ int do_plog(void) {
         case GET_PLOG_BYINDX:
             printf("plog was called with GET_PLOG_BYINDX\n");
             int index = m_in.plog_int;
-            if (index < 0 || index > PLOG_MAX_TABLE_SIZE - 1) { 
+            if (index < 0 || index > PLOG_MAX_TABLE_SIZE - 1) {
                return 3;
             }
             mp->mp_reply.plog_ctime = plog_table.content[index].c_time;
             mp->mp_reply.plog_ttime = plog_table.content[index].t_time;
+            if (plog_table.table_size < PLOG_MAX_TABLE_SIZE && index >= plog_table.current_indx) { 
+                return 3;
+            }
             return 0;
 
         case GET_PLOG_BYPID:

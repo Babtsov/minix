@@ -67,10 +67,11 @@ void test_get_plog_by_invalid_index_or_pid(void) {
     int status_for_neg = get_plog_byindex(-1, &c_time, &t_time);
     int status_for_too_large = get_plog_byindex(plog_buffer_size, &c_time, &t_time);
     int status_pid_not_found = get_plog_byPID(1, &c_time, &t_time);
+    int status_for_non_existing_index = get_plog_byindex(10, &c_time, &t_time);
 
     // assert
     if (status_for_too_large == 3 && status_for_neg == 3 && status_pid_not_found == 2
-            && c_time == 345 && t_time == 356) {
+            && c_time == 345 && t_time == 356 && status_for_non_existing_index == 3) {
         printf(ECHO_SUCCESS);
     } else {
         printf(ECHO_OOPS);
@@ -159,12 +160,12 @@ int main(int argc, char ** argv) {
 
 void table_dump(int start, int end) {
     printf("@@@@@@@@@@@  PLOG BUFFER DUMP  @@@@@@@@@@\n");
-    printf("index\t|creation time\t|termination time\n");
-    long c_time = -1, t_time = -1;
+    printf("code\t|index\t|creation time\t|termination time\n");
     for (int i = start; i < end; i++) {
-        get_plog_byindex(i, &c_time, &t_time);
+        long c_time = 0, t_time = 0;
+        int code = get_plog_byindex(i, &c_time, &t_time);
         char * padding = (c_time != 0)? "\t" : "\t\t";
-        printf("%d\t|%ld%s|%ld\n", i , c_time, padding, t_time);
+        printf("%d\t|%d\t|%ld%s|%ld\n", code, i , c_time, padding, t_time);
     }
 }
 
