@@ -12,7 +12,9 @@ int do_plog(struct proc *caller_ptr, message *m_ptr) {
     int pid = m_ptr->m1_i1;
     int proc_index = m_ptr->m1_i2;
     bool enabled = m_ptr->m1_i3;
-    printf("kernel: pid: %d index: %d. enabled %d\n",pid, proc_index, enabled);
+    struct proc * entry = proc_addr(proc_index);
+    printf("kernel: process name: %s\n", entry->p_name);
+    printf("kernel: pid: %d index: %d. enabled %d\n", pid, proc_index, enabled);
     printf("kernel: bye\n");     
     return(OK);
 }
