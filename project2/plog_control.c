@@ -8,7 +8,7 @@ int main(int argc, char** argv) {
     int pid = atoi(argv[2]);
     
     if (enabled)
-        plog_state_start(pid)
+        plog_state_start(pid);
     else
         plog_state_stop(pid);
     return 0;

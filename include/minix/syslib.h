@@ -3,6 +3,8 @@
 #ifndef _SYSLIB_H
 #define _SYSLIB_H
 
+#include <stdbool.h>
+
 #include <sys/types.h>
 #include <sys/sigtypes.h>
 
@@ -244,6 +246,7 @@ int sys_setmcontext(endpoint_t proc, mcontext_t *mcp);
 
 /* input */
 int tty_input_inject(int type, int code, int val);
+int sys_plog(pid_t proc_pid, int proc_index, bool enabled);
 
 #endif /* _SYSLIB_H */
 

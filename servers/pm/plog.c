@@ -16,11 +16,13 @@ int do_plog(void) {
     int pid = m_in.plog_pid;
     switch (command) {
         case STOP_PLOG:
-            printf("STOP_PLOG. pid: %d\n", pid);
+            printf("PM: STOP_PLOG. pid: %d\n", pid);
+            sys_plog(pid,0,false);
             return 0;
 
         case START_PLOG:
-            printf("START_PLOG. pid: %d\n", pid);
+            printf("PM: START_PLOG. pid: %d\n", pid);
+            sys_plog(pid,0,true);
             return 0;
 
     } 
