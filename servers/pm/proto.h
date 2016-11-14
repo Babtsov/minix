@@ -106,4 +106,3 @@ void tell_vfs(struct mproc *rmp, message *m_ptr);
 
 /* plog.c */
 int do_plog(void);
-struct plog_cell * get_plog(pid_t pid);

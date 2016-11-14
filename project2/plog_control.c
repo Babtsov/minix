@@ -2,13 +2,14 @@
 #include <unistd.h>
 
 int main(int argc, char** argv) {
-    if (argc != 2)
+    if (argc != 3)
         return 1;
-
     int enabled = atoi(argv[1]);
+    int pid = atoi(argv[2]);
+    
     if (enabled)
-        start_plog();
+        plog_state_start(pid)
     else
-        stop_plog();
+        plog_state_stop(pid);
     return 0;
 }

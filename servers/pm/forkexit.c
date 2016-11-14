@@ -37,7 +37,7 @@ static void tell_parent(struct mproc *child);
 static void tell_tracer(struct mproc *child);
 static void tracer_died(struct mproc *child);
 static void cleanup(register struct mproc *rmp);
-static long get_time(void);
+
 /*===========================================================================*
  *				do_fork					     *
  *===========================================================================*/
@@ -112,18 +112,6 @@ int do_fork()
   /* Find a free pid for the child and put it in the table. */
   new_pid = get_free_pid();
   rmc->mp_pid = new_pid;	/* assign pid to child */
-  
-  /* Start recording time for the new child */  
-  if (plog_table.enabled) {
-      printf("@@@FORK while recording! PID: %d| plog index = %d.\n", new_pid, plog_table.current_indx);
-      struct plog_cell cell = {new_pid, get_time(), 0};
-      int indx = plog_table.current_indx;
-      plog_table.content[indx] = cell;
-      indx = (indx + 1) % PLOG_MAX_TABLE_SIZE; 
-      plog_table.current_indx = indx;
-      if (plog_table.table_size < PLOG_MAX_TABLE_SIZE) 
-          plog_table.table_size++;
-  }
 
   m.m_type = PM_FORK;
   m.PM_PROC = rmc->mp_endpoint;
@@ -131,6 +119,7 @@ int do_fork()
   m.PM_CPID = rmc->mp_pid;
   m.PM_REUID = -1;	/* Not used by PM_FORK */
   m.PM_REGID = -1;	/* Not used by PM_FORK */
+
   tell_vfs(rmc, &m);
 
 #if USE_TRACE
@@ -304,18 +293,6 @@ int dump_core;			/* flag indicating whether to dump core */
   p_mp = &mproc[rmp->mp_parent];			/* process' parent */
   p_mp->mp_child_utime += user_time + rmp->mp_child_utime; /* add user time */
   p_mp->mp_child_stime += sys_time + rmp->mp_child_stime; /* add system time */
-  
-  /* grab termination time for plog */ 
-  if (plog_table.enabled) {
-    printf("@@@EXIT while recording! PID: %d| ",rmp->mp_pid);
-    struct plog_cell * cell = get_plog(rmp->mp_pid);
-    if (cell) {                     /* if the process' starting time got recorded */
-        printf("found in plog. recording...\n");
-        cell->t_time = get_time();  /* record also its termination time */
-    } else {
-        printf("not found in plog!~~~~~~~~~~~~~~~~~~~~~~~~~~~\n");
-    }
-  }
 
   /* Tell the kernel the process is no longer runnable to prevent it from 
    * being scheduled in between the following steps. Then tell VFS that it 
@@ -735,17 +712,6 @@ struct mproc *child;			/* process being traced */
   }
 }
 #endif /* USE_TRACE */
-
-/*===========================================================================*
- *				get_time					     *
- *===========================================================================*/
-static long get_time(void) {
-    clock_t uptime, boottime;
-    int s;
-    if ( (s=getuptime2(&uptime, &boottime)) != OK) 
-        panic("do_time couldn't get uptime: %d", s); 
-    return boottime + (uptime/system_hz);
-}
 
 /*===========================================================================*
  *				cleanup					     *

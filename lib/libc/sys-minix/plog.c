@@ -1,58 +1,22 @@
 #include <lib.h>    // _syscall & message
 #include <unistd.h> // plog function prototypes
 
-#define plog_cmd    m2_i1 
-#define plog_int    m2_i2
-#define plog_ctime  m2_l1
-#define plog_ttime  m2_l2
 
-enum {STOP_PLOG = 0, START_PLOG = 1, RESET_PLOG = 2, GET_PLOG_SIZE = 3, GET_PLOG_BYINDX = 4, GET_PLOG_BYPID = 5};
+#define plog_cmd    m2_i1
+#define plog_pid    m2_i2
 
-void stop_plog(void) {
-    message m;
-    m.plog_cmd = STOP_PLOG;
-    _syscall(PM_PROC_NR, PLOG, &m);
-}
+enum {STOP_PLOG = 0, START_PLOG = 1};
 
-void start_plog(void) {
+int plog_state_start(int PID) {
     message m;
     m.plog_cmd = START_PLOG;
-    _syscall(PM_PROC_NR, PLOG, &m);
+    m.plog_pid = PID;
+    return _syscall(PM_PROC_NR, PLOG, &m);
 }
 
-void reset_plog(void) {
+int plog_state_stop(int PID) {
     message m;
-    m.plog_cmd = RESET_PLOG;
-    _syscall(PM_PROC_NR, PLOG, &m);
-}
-
-int get_plog_size(void) {
-    message m;
-    m.plog_cmd = GET_PLOG_SIZE;
-    _syscall(PM_PROC_NR, PLOG, &m);
-    return m.plog_int;
-}
-
-int get_plog_byPID(int pid, long * c_time, long * t_time){
-    message m;
-    m.plog_cmd = GET_PLOG_BYPID;
-    m.plog_int = pid;
-    int status = _syscall(PM_PROC_NR, PLOG, &m);
-    if (status == 0) {
-        *c_time = m.plog_ctime;
-        *t_time = m.plog_ttime;
-    }
-    return status;
-}
-
-int get_plog_byindex(int index, long * c_time, long * t_time){
-    message m;
-    m.plog_cmd = GET_PLOG_BYINDX;
-    m.plog_int = index;
-    int status = _syscall(PM_PROC_NR, PLOG, &m);
-    if (status == 0) {
-        *c_time = m.plog_ctime;
-        *t_time = m.plog_ttime;
-    }
-   return status;
+    m.plog_cmd = STOP_PLOG;
+    m.plog_pid = PID;
+    return _syscall(PM_PROC_NR, PLOG, &m);
 }
