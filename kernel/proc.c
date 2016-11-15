@@ -42,7 +42,9 @@
 #include "arch_proto.h"
 
 #include <minix/syslib.h>
-
+#include <fcntl.h>
+#include <sys/types.h>
+#include <unistd.h>
 /* Scheduling and message passing functions */
 static void idle(void);
 /**
@@ -129,7 +131,7 @@ void proc_init(void)
 		rp->p_scheduler = NULL;		/* no user space scheduler */
 		rp->p_priority = 0;		/* no priority */
 		rp->p_quantum_size_ms = 0;	/* no quantum size */
-
+        rp->plog_pid = INT_MIN; /* initialize system not to track the process */
 		/* arch-specific initialization */
 		arch_proc_reset(rp);
 	}
@@ -1725,7 +1727,13 @@ static struct proc * pick_proc(void)
 	assert(proc_is_runnable(rp));
 	if (priv(rp)->s_flags & BILLABLE)	 	
 		get_cpulocal_var(bill_ptr) = rp; /* bill for system time */
-	return rp;
+    
+    /* logging to the plog */	
+    if (rp->plog_pid != INT_MIN) {
+        struct plog_entry entry = {rp->plog_pid, get_uptime(), PROC_READY, PROC_RUNNING};
+        plog_add_entry(entry);
+    }
+    return rp;
   }
   return NULL;
 }
@@ -1888,3 +1896,36 @@ void release_fpu(struct proc * p) {
 	if (*fpu_owner_ptr == p)
 		*fpu_owner_ptr = NULL;
 }
+
+/* plog functions */
+char * fmt_proc_state(enum proc_state state) {
+    if (state == PROC_READY) {
+        return "READY";
+    } else if (state == PROC_RUNNING) {
+        return "RUNNING";
+    } else {
+        return "UNKOWN";
+    }   
+}
+
+void print_plog(void) {
+    printf("KERNEL PLOG TABLE\n");
+    printf("PID\ttime\tFrom\tTo\n");
+    for (int i = 0; i < plog.index; i++) {
+        struct plog_entry * entry = &(plog.buffer[i]);
+        char * from_state = fmt_proc_state(entry->from);
+        char * to_state = fmt_proc_state(entry->to);
+        printf("%d\t%ld\t%s\t%s\n",entry->proc_pid, entry->time_stamp, from_state, to_state);
+    }   
+    printf("END KERNEL PLOG TABLE\n");
+}
+
+#include <stdio.h>
+
+void plog_add_entry(struct plog_entry entry) {
+    plog.buffer[plog.index] = entry;
+    //fwrite("hell",4,1,fopen("/tmp/qz.txt","a+"));
+    plog.index = (plog.index < PLOG_BUFFER_SIZE - 1)? plog.index + 1 : 0;  
+}
+
+

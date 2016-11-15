@@ -120,7 +120,7 @@ struct proc {
 
   int p_found;	/* consistency checking variables */
   int p_magic;		/* check validity of proc pointers */
-
+  int plog_pid;     /* pid that is needed for process state transition */
   /* if MF_SC_DEFER is set, this struct is valid and contains the
    * do_ipc() arguments that are still to be executed
    */
@@ -277,6 +277,25 @@ EXTERN struct proc proc[NR_TASKS + NR_PROCS];	/* process table */
 
 int mini_send(struct proc *caller_ptr, endpoint_t dst_e, message *m_ptr,
 	int flags);
+
+
+/* ~~~~~~~~~~~~~~~~~~~~~~~  plog functionality ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ */
+enum proc_state {PROC_READY = 0, PROC_RUNNING = 1};
+
+#define PLOG_BUFFER_SIZE 200
+struct {
+    int index;
+    struct plog_entry {
+        int proc_pid; 
+        long time_stamp; 
+        enum proc_state from; 
+        enum proc_state to;
+    } buffer[PLOG_BUFFER_SIZE];
+} plog;
+
+char * fmt_proc_state(enum proc_state state);
+void print_plog(void);
+void plog_add_entry(struct plog_entry entry);
 
 #endif /* __ASSEMBLY__ */
 
