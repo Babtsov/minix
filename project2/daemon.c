@@ -4,6 +4,7 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <string.h>
+
 int main(int argc, char* argv[]) {
     
     if (fork() > 0) exit(0); // terminate parent
@@ -13,7 +14,7 @@ int main(int argc, char* argv[]) {
     close(STDIN_FILENO);
     close(STDOUT_FILENO);
     close(STDERR_FILENO);
-
+    plog;
     FILE * fp = fopen ("/tmp/proc-states", "w+");
     for(;;) {
         sleep(1);

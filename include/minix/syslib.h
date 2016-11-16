@@ -246,7 +246,7 @@ int sys_setmcontext(endpoint_t proc, mcontext_t *mcp);
 
 /* input */
 int tty_input_inject(int type, int code, int val);
-int sys_plog(pid_t proc_pid, int proc_index, bool enabled);
+int sys_plog(pid_t proc_pid, int proc_index, bool enabled, void * plog_ptr);
 
 #endif /* _SYSLIB_H */
 

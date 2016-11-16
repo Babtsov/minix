@@ -7,6 +7,7 @@
 
 #define plog_cmd    m2_i1 
 #define plog_pid    m2_i2
+#define plog_addr   m1_p1
 
 enum {STOP_PLOG = 0, START_PLOG = 1};
 
@@ -14,12 +15,7 @@ enum {STOP_PLOG = 0, START_PLOG = 1};
 #include <sys/types.h>
 #include <fcntl.h>
 #include <unistd.h>
-void test(void) {
-    int F = open("/tmp/qaz.txt",O_APPEND);
-    char buff[10];
-    int bytes = sprintf(buff,"%d",123);
-    dprintf(F,"judge %d",bytes);
-}
+
 int do_plog(void) {
     int command = m_in.plog_cmd;
     int pid = m_in.plog_pid;
@@ -34,13 +30,12 @@ int do_plog(void) {
     switch (command) {
         case STOP_PLOG:
             printf("PM: STOP_PLOG. pid: %d\n", pid);
-            test();
-            sys_plog(pid, proc_index, false);
+            sys_plog(pid, proc_index, false, m_in.plog_addr);
             return 0;
 
         case START_PLOG:
             printf("PM: START_PLOG. pid: %d\n", pid);
-            sys_plog(pid, proc_index, true);
+            sys_plog(pid, proc_index, true, m_in.plog_addr);
             return 0;
 
     } 
