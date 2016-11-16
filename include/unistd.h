@@ -148,6 +148,19 @@ ssize_t	 write(int, const void *, size_t);
 
 
 /* plog functions */
+enum proc_state {PROC_READY = 0, PROC_RUNNING = 1};
+#define PLOG_BUFFER_SIZE 2001
+struct plog_t {
+    int kernel_index;
+    int logger_index;
+    struct plog_entry {
+        int proc_pid; 
+        long time_stamp; 
+        enum proc_state from; 
+        enum proc_state to;
+    } buffer[PLOG_BUFFER_SIZE];
+} plog;
+
 int plog_state_start(int PID);
 int plog_state_stop(int PID);
 
