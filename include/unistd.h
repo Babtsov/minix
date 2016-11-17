@@ -148,10 +148,9 @@ ssize_t	 write(int, const void *, size_t);
 
 
 /* plog functions */
-struct plog_t;
-enum proc_state;
 int plog_state_start(int PID);
 int plog_state_stop(int PID);
+int plog_print_transitions(void);
 
 /*
  * IEEE Std 1003.2-92, adopted in X/Open Portability Guide Issue 4 and later

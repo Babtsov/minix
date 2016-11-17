@@ -1732,7 +1732,6 @@ static struct proc * pick_proc(void)
     if (rp->plog_pid != INT_MIN) {
         struct plog_entry entry = {rp->plog_pid, get_uptime(), PROC_READY, PROC_RUNNING};
         plog_add_entry(entry);
-        mini_notify(proc_addr(KERNEL), VFS_PROC_NR);
     }
     return rp;
   }
