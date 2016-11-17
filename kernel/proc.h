@@ -3,7 +3,7 @@
 
 #include <minix/const.h>
 #include <sys/cdefs.h>
-
+#include <stdbool.h>
 #ifndef __ASSEMBLY__
 
 /* Here is the declaration of the process table.  It contains all process
@@ -284,12 +284,14 @@ enum proc_state {PROC_READY = 0, PROC_RUNNING = 1};
 
 #define PLOG_BUFFER_SIZE 200
 struct {
-    int index;
+    int writer_index;
+    int reader_index;
     struct plog_entry {
         int proc_pid; 
         long time_stamp; 
         enum proc_state from; 
         enum proc_state to;
+        bool occupied;          // this slot is occupied by data we haven't printed yet
     } buffer[PLOG_BUFFER_SIZE];
 } plog;
 

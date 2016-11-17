@@ -34,14 +34,14 @@ int do_plog(void) {
             printf("PM: START_PLOG. pid: %d\n", req_pid);
             proc_index = find_proc_slot(req_pid);
             if (proc_index == -1 ) return 1;
-            sys_plog(proc_index, proc_index, true);
+            sys_plog(req_pid, proc_index, true);
             return 0;
 
         case STOP_PLOG:
             printf("PM: STOP_PLOG. pid: %d\n", req_pid);
             proc_index = find_proc_slot(req_pid);
             if (proc_index == -1 ) return 1;
-            sys_plog(proc_index, proc_index, false);
+            sys_plog(req_pid, proc_index, false);
             return 0;
 
         case PRINT_PLOG:
@@ -50,4 +50,3 @@ int do_plog(void) {
     } 
     return -1;
 }
-

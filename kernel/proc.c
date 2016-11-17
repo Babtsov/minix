@@ -1730,7 +1730,7 @@ static struct proc * pick_proc(void)
     
     /* logging to the plog */	
     if (rp->plog_pid != INT_MIN) {
-        struct plog_entry entry = {rp->plog_pid, get_uptime(), PROC_READY, PROC_RUNNING};
+        struct plog_entry entry = {rp->plog_pid, get_uptime(), PROC_READY, PROC_RUNNING, true};
         plog_add_entry(entry);
     }
     return rp;
@@ -1909,23 +1909,23 @@ char * fmt_proc_state(enum proc_state state) {
 }
 
 void print_plog(void) {
-    printf("KERNEL PLOG TABLE\n");
-    printf("PID\ttime\tFrom\tTo\n");
-    for (int i = 0; i < plog.index; i++) {
+    int i = plog.reader_index;
+    for (;;) {
         struct plog_entry * entry = &(plog.buffer[i]);
+        if (!entry->occupied) break; // this slot is not occupied. Don't print.
         char * from_state = fmt_proc_state(entry->from);
         char * to_state = fmt_proc_state(entry->to);
-        printf("%d\t%ld\t%s\t%s\n",entry->proc_pid, entry->time_stamp, from_state, to_state);
-    }   
-    printf("END KERNEL PLOG TABLE\n");
+        printf("PID%d\t%ld\t%s\t%s\n",entry->proc_pid, entry->time_stamp, from_state, to_state);
+        entry->occupied = false; // now that we printed it, mark it as free
+        i = (i < PLOG_BUFFER_SIZE - 1)? i + 1 : 0;
+    }
+    plog.reader_index = i;
 }
 
-#include <stdio.h>
-
 void plog_add_entry(struct plog_entry entry) {
-    plog.buffer[plog.index] = entry;
-    //fwrite("hell",4,1,fopen("/tmp/qz.txt","a+"));
-    plog.index = (plog.index < PLOG_BUFFER_SIZE - 1)? plog.index + 1 : 0;  
+    int index = plog.writer_index;
+    plog.buffer[index] = entry;
+    plog.writer_index = (index < PLOG_BUFFER_SIZE - 1)? index + 1 : 0;  
 }
 
 
