@@ -148,11 +148,22 @@ ssize_t	 write(int, const void *, size_t);
 
 
 /* plog functions */
-struct plog_t;
-enum proc_state;
+#define PLOG_BUFFER_SIZE 1024
+enum proc_state {PROC_READY = 0, PROC_RUNNING = 1};
+struct plog_t {
+    int kernel_index;
+    int logger_index;
+    struct plog_entry {
+        int proc_pid; 
+        long time_stamp; 
+        enum proc_state from; 
+        enum proc_state to; 
+    } buffer[PLOG_BUFFER_SIZE];
+}; 
+struct plog_t * get_plog_ptr(void);
+int set_plog_ptr(void);
 int plog_state_start(int PID);
 int plog_state_stop(int PID);
-
 /*
  * IEEE Std 1003.2-92, adopted in X/Open Portability Guide Issue 4 and later
  */

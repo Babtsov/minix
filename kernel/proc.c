@@ -1730,9 +1730,10 @@ static struct proc * pick_proc(void)
     
     /* logging to the plog */	
     if (rp->plog_pid != INT_MIN) {
-        struct plog_entry entry = {rp->plog_pid, get_uptime(), PROC_READY, PROC_RUNNING};
-        plog_add_entry(entry);
-        mini_notify(proc_addr(KERNEL), VFS_PROC_NR);
+        plog_ptr->kernel_index++;
+        //struct plog_entry entry = {rp->plog_pid, get_uptime(), PROC_READY, PROC_RUNNING};
+        //plog_add_entry(entry);
+        //mini_notify(proc_addr(KERNEL), VFS_PROC_NR);
     }
     return rp;
   }
@@ -1899,34 +1900,11 @@ void release_fpu(struct proc * p) {
 }
 
 /* plog functions */
-char * fmt_proc_state(enum proc_state state) {
-    if (state == PROC_READY) {
-        return "READY";
-    } else if (state == PROC_RUNNING) {
-        return "RUNNING";
-    } else {
-        return "UNKOWN";
-    }   
-}
 
-void print_plog(void) {
-    printf("KERNEL PLOG TABLE\n");
-    printf("PID\ttime\tFrom\tTo\n");
-    for (int i = 0; i < plog.index; i++) {
-        struct plog_entry * entry = &(plog.buffer[i]);
-        char * from_state = fmt_proc_state(entry->from);
-        char * to_state = fmt_proc_state(entry->to);
-        printf("%d\t%ld\t%s\t%s\n",entry->proc_pid, entry->time_stamp, from_state, to_state);
-    }   
-    printf("END KERNEL PLOG TABLE\n");
-}
-
-#include <stdio.h>
-
-void plog_add_entry(struct plog_entry entry) {
-    plog.buffer[plog.index] = entry;
+//void plog_add_entry(struct plog_entry entry) {
+    //plog.buffer[plog.index] = entry;
     //fwrite("hell",4,1,fopen("/tmp/qz.txt","a+"));
-    plog.index = (plog.index < PLOG_BUFFER_SIZE - 1)? plog.index + 1 : 0;  
-}
+    //plog.index = (plog.index < PLOG_BUFFER_SIZE - 1)? plog.index + 1 : 0;  
+//}
 
 

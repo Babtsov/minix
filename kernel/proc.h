@@ -18,7 +18,7 @@
 #include <minix/portio.h>
 #include "const.h"
 #include "priv.h"
-
+#include <unistd.h>
 struct proc {
   struct stackframe_s p_reg;	/* process' registers saved in stack frame */
   struct segframe p_seg;	/* segment descriptors */
@@ -280,18 +280,7 @@ int mini_send(struct proc *caller_ptr, endpoint_t dst_e, message *m_ptr,
 
 
 /* ~~~~~~~~~~~~~~~~~~~~~~~  plog functionality ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ */
-enum proc_state {PROC_READY = 0, PROC_RUNNING = 1};
-
-#define PLOG_BUFFER_SIZE 200
-struct {
-    int index;
-    struct plog_entry {
-        int proc_pid; 
-        long time_stamp; 
-        enum proc_state from; 
-        enum proc_state to;
-    } buffer[PLOG_BUFFER_SIZE];
-} plog;
+struct plog_t * plog_ptr;
 
 char * fmt_proc_state(enum proc_state state);
 void print_plog(void);
