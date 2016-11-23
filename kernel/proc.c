@@ -847,7 +847,10 @@ int mini_send(
 		dst_ptr->p_misc_flags &= ~MF_REPLY_PEND;
 
 	RTS_UNSET(dst_ptr, RTS_RECEIVING);
-
+    if (dst_ptr->plog_pid != INT_MIN) {
+        struct plog_entry entry = {dst_ptr->plog_pid, get_uptime(), PROC_BLOCKED, PROC_READY, true};
+        plog_add_entry(entry);
+    } 
 #if DEBUG_IPC_HOOK
 	hook_ipc_msgsend(&dst_ptr->p_delivermsg, caller_ptr, dst_ptr);
 	hook_ipc_msgrecv(&dst_ptr->p_delivermsg, caller_ptr, dst_ptr);
@@ -1087,6 +1090,10 @@ int mini_notify(
 
       IPC_STATUS_ADD_CALL(dst_ptr, NOTIFY);
       RTS_UNSET(dst_ptr, RTS_RECEIVING);
+      if (dst_ptr->plog_pid != INT_MIN) {
+        struct plog_entry entry = {dst_ptr->plog_pid, get_uptime(), PROC_BLOCKED, PROC_READY, true};
+        plog_add_entry(entry);
+      } 
       // struct plog_entry entry = {dst_ptr->plog_pid, get_uptime(), PROC_BLOCKED, PROC_READY, true};
       // plog_add_entry(entry);
       return(OK);
@@ -1236,6 +1243,11 @@ int try_deliver_senda(struct proc *caller_ptr,
 		dst_ptr->p_misc_flags |= MF_DELIVERMSG;
 		IPC_STATUS_ADD_CALL(dst_ptr, SENDA);
 		RTS_UNSET(dst_ptr, RTS_RECEIVING);
+         if (dst_ptr->plog_pid != INT_MIN) {
+            struct plog_entry entry = {dst_ptr->plog_pid, get_uptime(), PROC_BLOCKED, PROC_READY, true};
+            plog_add_entry(entry);
+         } 
+
 	} else if (r == OK) {
 		/* Inform receiver that something is pending */
 		set_sys_bit(priv(dst_ptr)->s_asyn_pending, 
