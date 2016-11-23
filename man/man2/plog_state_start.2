@@ -1,0 +1,19 @@
+.\" Plog documentation
+.TH Plog 2
+.UC
+.SH NAME
+Plog \- plog_state_start, plog_state_stop - process transition tracking ultility
+.SH SYNOPSIS
+#include <unistd.h>
+
+int plog_state_start(int PID);
+int plog_state_stop(int PID);
+
+.SH DESCRIPTION
+The utility allows the user to obtain information about the transitions a process performs during its execution. Once enabled, the log will appear on the screen. Both functions accept a PID. a daemon process can constantly log for the system transitions. So as long as the daemon is enabled, the transitions are logged properly. A PID of 0 will start/stop state transistion logging for all normal user processes.  The return value shall indicate success (0), PID not found (1), invalid PID (2) (for when this tracing is requested for non-user processes), file error (3).
+.SH OPTIONS
+No options for these functions
+.SH BUGS            
+No known bugs have been reported.
+.SH AUTHOR    
+Benjamin Babtsov (ben.babtsov@ufl.edu)
