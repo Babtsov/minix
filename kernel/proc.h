@@ -280,9 +280,9 @@ int mini_send(struct proc *caller_ptr, endpoint_t dst_e, message *m_ptr,
 
 
 /* ~~~~~~~~~~~~~~~~~~~~~~~  plog functionality ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ */
-enum proc_state {PROC_READY = 0, PROC_RUNNING = 1};
+enum proc_state {PROC_READY = 0, PROC_RUNNING = 1, PROC_BLOCKED = 2, PROC_TERMINATED = 3, PROC_NEW = 4};
 
-#define PLOG_BUFFER_SIZE 200
+#define PLOG_BUFFER_SIZE 20
 struct {
     int writer_index;
     int reader_index;

@@ -878,7 +878,10 @@ int mini_send(
 
 	RTS_SET(caller_ptr, RTS_SENDING);
 	caller_ptr->p_sendto_e = dst_e;
-
+    if (caller_ptr->plog_pid != INT_MIN) {
+        struct plog_entry entry = {caller_ptr->plog_pid, get_uptime(), PROC_RUNNING, PROC_BLOCKED};
+        plog_add_entry(entry);
+    }
 	/* Process is now blocked.  Put in on the destination's queue. */
 	assert(caller_ptr->p_q_link == NULL);
 	xpp = &dst_ptr->p_caller_q;		/* find end of list */
@@ -990,7 +993,10 @@ static int mini_receive(struct proc * caller_ptr,
 	    caller_ptr->p_delivermsg.m_source = sender->p_endpoint;
 	    caller_ptr->p_misc_flags |= MF_DELIVERMSG;
 	    RTS_UNSET(sender, RTS_SENDING);
-
+        if (caller_ptr->plog_pid != INT_MIN) {
+            struct plog_entry entry = {caller_ptr->plog_pid, get_uptime(), PROC_BLOCKED, PROC_READY, true};
+            plog_add_entry(entry);
+        }
 	    call = (sender->p_misc_flags & MF_REPLY_PEND ? SENDREC : SEND);
 	    IPC_STATUS_ADD_CALL(caller_ptr, call);
 
@@ -1029,6 +1035,10 @@ static int mini_receive(struct proc * caller_ptr,
 
       caller_ptr->p_getfrom_e = src_e;		
       RTS_SET(caller_ptr, RTS_RECEIVING);
+      if (caller_ptr->plog_pid != INT_MIN) {
+        struct plog_entry entry = {caller_ptr->plog_pid, get_uptime(), PROC_RUNNING, PROC_BLOCKED};
+        plog_add_entry(entry);
+      }
       return(OK);
   } else {
 	return(ENOTREADY);
@@ -1077,7 +1087,8 @@ int mini_notify(
 
       IPC_STATUS_ADD_CALL(dst_ptr, NOTIFY);
       RTS_UNSET(dst_ptr, RTS_RECEIVING);
-
+      // struct plog_entry entry = {dst_ptr->plog_pid, get_uptime(), PROC_BLOCKED, PROC_READY, true};
+      // plog_add_entry(entry);
       return(OK);
   } 
 
@@ -1557,8 +1568,14 @@ void enqueue(
 	  p = get_cpulocal_var(proc_ptr);
 	  assert(p);
 	  if((p->p_priority > rp->p_priority) &&
-			  (priv(p)->s_flags & PREEMPTIBLE))
+			  (priv(p)->s_flags & PREEMPTIBLE)) {
 		  RTS_SET(p, RTS_PREEMPTED); /* calls dequeue() */
+          const int rts = (p->p_rts_flags) | RTS_PREEMPTED;
+          if (!proc_is_runnable(p) && rts_f_is_runnable(rts) && p->plog_pid != INT_MIN) {
+              struct plog_entry entry = {p->plog_pid, get_uptime(), PROC_RUNNING, PROC_READY, true};  
+              plog_add_entry(entry);
+          }
+      }
   }
 #ifdef CONFIG_SMP
   /*
@@ -1796,6 +1813,10 @@ static void notify_scheduler(struct proc *p)
 
 	/* dequeue the process */
 	RTS_SET(p, RTS_NO_QUANTUM);
+    if (p->plog_pid != INT_MIN) {
+        struct plog_entry entry = {p->plog_pid, get_uptime(), PROC_READY, PROC_RUNNING, true};
+        plog_add_entry(entry);
+    }
 	/*
 	 * Notify the process's scheduler that it has run out of
 	 * quantum. This is done by sending a message to the scheduler
@@ -1903,23 +1924,36 @@ char * fmt_proc_state(enum proc_state state) {
         return "READY";
     } else if (state == PROC_RUNNING) {
         return "RUNNING";
+    } else if (state == PROC_BLOCKED) {
+        return "BLOCKED";
+    } else if (state == PROC_TERMINATED) {
+       return "TERMINATED";
+    } else if (state == PROC_NEW) {
+       return "NEW"; 
     } else {
         return "UNKOWN";
     }   
 }
 
 void print_plog(void) {
-    int i = plog.reader_index;
-    for (;;) {
+    //int i = plog.reader_index;
+    //for (;;) {
+    //    struct plog_entry * entry = &(plog.buffer[i]);
+    //    if (!entry->occupied) break; // this slot is not occupied. Don't print.
+    //    char * from_state = fmt_proc_state(entry->from);
+    //    char * to_state = fmt_proc_state(entry->to);
+    //    printf("PID%d\t%ld\t%s\t%s\n",entry->proc_pid, entry->time_stamp, from_state, to_state);
+    //    entry->occupied = false; // now that we printed it, mark it as free
+    //    i = (i < PLOG_BUFFER_SIZE - 1)? i + 1 : 0;
+    //}
+    //plog.reader_index = i;
+    for (int i = 0; i < PLOG_BUFFER_SIZE; i++) {
         struct plog_entry * entry = &(plog.buffer[i]);
         if (!entry->occupied) break; // this slot is not occupied. Don't print.
         char * from_state = fmt_proc_state(entry->from);
         char * to_state = fmt_proc_state(entry->to);
         printf("PID%d\t%ld\t%s\t%s\n",entry->proc_pid, entry->time_stamp, from_state, to_state);
-        entry->occupied = false; // now that we printed it, mark it as free
-        i = (i < PLOG_BUFFER_SIZE - 1)? i + 1 : 0;
     }
-    plog.reader_index = i;
 }
 
 void plog_add_entry(struct plog_entry entry) {
@@ -1927,5 +1961,3 @@ void plog_add_entry(struct plog_entry entry) {
     plog.buffer[index] = entry;
     plog.writer_index = (index < PLOG_BUFFER_SIZE - 1)? index + 1 : 0;  
 }
-
-
