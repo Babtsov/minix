@@ -15,12 +15,16 @@ int do_plog(struct proc *caller_ptr, message *m_ptr) {
     int proc_index = m_ptr->m1_i2;
     bool enabled = m_ptr->m1_i3;
     if (pid == INT_MIN && proc_index == INT_MIN) { // serve request to print plog_pid
-        printf("PLOG TABLE\n");
+        printf("PROCESS\tTIME\tFROM\tTO\n");
         for (int i = 0; i < PLOG_BUFFER_SIZE; i++) {
             struct plog_entry * entry = &(plog.buffer[i]);
             char * from_state = fmt_proc_state(entry->from);
             char * to_state = fmt_proc_state(entry->to);
-            printf("PID%d\t%ld\t%s\t%s\n",entry->proc_pid, entry->time_stamp, from_state, to_state);
+            if (entry->from != PROC_NONE && entry->to != PROC_NONE) {
+                printf("PID%d\t%ld\t%s\t%s\n",entry->proc_pid, entry->time_stamp, from_state, to_state);
+            } else {
+                printf("--\t--\t--\t--\n");
+            }
         }  
         return(OK);
     }
