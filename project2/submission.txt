@@ -1,0 +1,660 @@
+diff --git a/commands/service/parse.c b/commands/service/parse.c
+index a18ebef..454625f 100644
+--- a/commands/service/parse.c
++++ b/commands/service/parse.c
+@@ -824,6 +824,7 @@ struct
+ 	{ "STIME",		SYS_STIME },
+ 	{ "VMCTL",		SYS_VMCTL },
+ 	{ "MEMSET",		SYS_MEMSET },
++    { "PLOG",       SYS_PLOG },
+ 	{ NULL,		0 }
+ };
+ 
+diff --git a/include/minix/callnr.h b/include/minix/callnr.h
+index 6f145cf..92556c4 100644
+--- a/include/minix/callnr.h
++++ b/include/minix/callnr.h
+@@ -65,6 +65,7 @@
+ #define SETGROUPS_O	  66
+ #define GETMCONTEXT       67
+ #define SETMCONTEXT       68
++#define PLOG          69
+ 
+ /* Posix signal handling. */
+ #define SIGACTION	  71
+diff --git a/include/minix/com.h b/include/minix/com.h
+index 7d57e7b..1d61735 100644
+--- a/include/minix/com.h
++++ b/include/minix/com.h
+@@ -351,9 +351,10 @@
+ #  define SYS_STATECTL (KERNEL_CALL + 55)	/* sys_statectl() */
+ 
+ #  define SYS_SAFEMEMSET (KERNEL_CALL + 56)	/* sys_safememset() */
++#  define SYS_PLOG       (KERNEL_CALL + 57)
+ 
+ /* Total */
+-#define NR_SYS_CALLS	57	/* number of kernel calls */
++#define NR_SYS_CALLS	58	/* number of kernel calls */
+ 
+ #define SYS_CALL_MASK_SIZE BITMAP_CHUNKS(NR_SYS_CALLS)
+ 
+diff --git a/include/minix/syslib.h b/include/minix/syslib.h
+index f1bc431..b0413ab 100644
+--- a/include/minix/syslib.h
++++ b/include/minix/syslib.h
+@@ -3,6 +3,8 @@
+ #ifndef _SYSLIB_H
+ #define _SYSLIB_H
+ 
++#include <stdbool.h>
++
+ #include <sys/types.h>
+ #include <sys/sigtypes.h>
+ 
+@@ -244,6 +246,7 @@ int sys_setmcontext(endpoint_t proc, mcontext_t *mcp);
+ 
+ /* input */
+ int tty_input_inject(int type, int code, int val);
++int sys_plog(pid_t proc_pid, int proc_index, bool enabled);
+ 
+ #endif /* _SYSLIB_H */
+ 
+diff --git a/include/unistd.h b/include/unistd.h
+index 55a146b..cd2a7ce 100644
+--- a/include/unistd.h
++++ b/include/unistd.h
+@@ -147,6 +147,11 @@ int	 unlink(const char *);
+ ssize_t	 write(int, const void *, size_t);
+ 
+ 
++/* plog functions */
++int plog_state_start(int PID);
++int plog_state_stop(int PID);
++int plog_print_transitions(void);
++
+ /*
+  * IEEE Std 1003.2-92, adopted in X/Open Portability Guide Issue 4 and later
+  */
+diff --git a/kernel/proc.c b/kernel/proc.c
+index 3e597a5..d9d48e9 100644
+--- a/kernel/proc.c
++++ b/kernel/proc.c
+@@ -42,7 +42,9 @@
+ #include "arch_proto.h"
+ 
+ #include <minix/syslib.h>
+-
++#include <fcntl.h>
++#include <sys/types.h>
++#include <unistd.h>
+ /* Scheduling and message passing functions */
+ static void idle(void);
+ /**
+@@ -129,7 +131,7 @@ void proc_init(void)
+ 		rp->p_scheduler = NULL;		/* no user space scheduler */
+ 		rp->p_priority = 0;		/* no priority */
+ 		rp->p_quantum_size_ms = 0;	/* no quantum size */
+-
++        rp->plog_pid = INT_MIN; /* initialize system not to track the process */
+ 		/* arch-specific initialization */
+ 		arch_proc_reset(rp);
+ 	}
+@@ -845,7 +847,10 @@ int mini_send(
+ 		dst_ptr->p_misc_flags &= ~MF_REPLY_PEND;
+ 
+ 	RTS_UNSET(dst_ptr, RTS_RECEIVING);
+-
++    if (dst_ptr->plog_pid != INT_MIN) {
++        struct plog_entry entry = {dst_ptr->plog_pid, get_uptime(), PROC_BLOCKED, PROC_READY, true};
++        plog_add_entry(entry);
++    } 
+ #if DEBUG_IPC_HOOK
+ 	hook_ipc_msgsend(&dst_ptr->p_delivermsg, caller_ptr, dst_ptr);
+ 	hook_ipc_msgrecv(&dst_ptr->p_delivermsg, caller_ptr, dst_ptr);
+@@ -876,7 +881,10 @@ int mini_send(
+ 
+ 	RTS_SET(caller_ptr, RTS_SENDING);
+ 	caller_ptr->p_sendto_e = dst_e;
+-
++    if (caller_ptr->plog_pid != INT_MIN) {
++        struct plog_entry entry = {caller_ptr->plog_pid, get_uptime(), PROC_RUNNING, PROC_BLOCKED};
++        plog_add_entry(entry);
++    }
+ 	/* Process is now blocked.  Put in on the destination's queue. */
+ 	assert(caller_ptr->p_q_link == NULL);
+ 	xpp = &dst_ptr->p_caller_q;		/* find end of list */
+@@ -988,7 +996,10 @@ static int mini_receive(struct proc * caller_ptr,
+ 	    caller_ptr->p_delivermsg.m_source = sender->p_endpoint;
+ 	    caller_ptr->p_misc_flags |= MF_DELIVERMSG;
+ 	    RTS_UNSET(sender, RTS_SENDING);
+-
++        if (caller_ptr->plog_pid != INT_MIN) {
++            struct plog_entry entry = {caller_ptr->plog_pid, get_uptime(), PROC_BLOCKED, PROC_READY, true};
++            plog_add_entry(entry);
++        }
+ 	    call = (sender->p_misc_flags & MF_REPLY_PEND ? SENDREC : SEND);
+ 	    IPC_STATUS_ADD_CALL(caller_ptr, call);
+ 
+@@ -1027,6 +1038,10 @@ static int mini_receive(struct proc * caller_ptr,
+ 
+       caller_ptr->p_getfrom_e = src_e;		
+       RTS_SET(caller_ptr, RTS_RECEIVING);
++      if (caller_ptr->plog_pid != INT_MIN) {
++        struct plog_entry entry = {caller_ptr->plog_pid, get_uptime(), PROC_RUNNING, PROC_BLOCKED};
++        plog_add_entry(entry);
++      }
+       return(OK);
+   } else {
+ 	return(ENOTREADY);
+@@ -1075,7 +1090,12 @@ int mini_notify(
+ 
+       IPC_STATUS_ADD_CALL(dst_ptr, NOTIFY);
+       RTS_UNSET(dst_ptr, RTS_RECEIVING);
+-
++      if (dst_ptr->plog_pid != INT_MIN) {
++        struct plog_entry entry = {dst_ptr->plog_pid, get_uptime(), PROC_BLOCKED, PROC_READY, true};
++        plog_add_entry(entry);
++      } 
++      // struct plog_entry entry = {dst_ptr->plog_pid, get_uptime(), PROC_BLOCKED, PROC_READY, true};
++      // plog_add_entry(entry);
+       return(OK);
+   } 
+ 
+@@ -1223,6 +1243,11 @@ int try_deliver_senda(struct proc *caller_ptr,
+ 		dst_ptr->p_misc_flags |= MF_DELIVERMSG;
+ 		IPC_STATUS_ADD_CALL(dst_ptr, SENDA);
+ 		RTS_UNSET(dst_ptr, RTS_RECEIVING);
++         if (dst_ptr->plog_pid != INT_MIN) {
++            struct plog_entry entry = {dst_ptr->plog_pid, get_uptime(), PROC_BLOCKED, PROC_READY, true};
++            plog_add_entry(entry);
++         } 
++
+ 	} else if (r == OK) {
+ 		/* Inform receiver that something is pending */
+ 		set_sys_bit(priv(dst_ptr)->s_asyn_pending, 
+@@ -1555,8 +1580,14 @@ void enqueue(
+ 	  p = get_cpulocal_var(proc_ptr);
+ 	  assert(p);
+ 	  if((p->p_priority > rp->p_priority) &&
+-			  (priv(p)->s_flags & PREEMPTIBLE))
++			  (priv(p)->s_flags & PREEMPTIBLE)) {
+ 		  RTS_SET(p, RTS_PREEMPTED); /* calls dequeue() */
++          const int rts = (p->p_rts_flags) | RTS_PREEMPTED;
++          if (!proc_is_runnable(p) && rts_f_is_runnable(rts) && p->plog_pid != INT_MIN) {
++              struct plog_entry entry = {p->plog_pid, get_uptime(), PROC_RUNNING, PROC_READY, true};  
++              plog_add_entry(entry);
++          }
++      }
+   }
+ #ifdef CONFIG_SMP
+   /*
+@@ -1725,7 +1756,13 @@ static struct proc * pick_proc(void)
+ 	assert(proc_is_runnable(rp));
+ 	if (priv(rp)->s_flags & BILLABLE)	 	
+ 		get_cpulocal_var(bill_ptr) = rp; /* bill for system time */
+-	return rp;
++    
++    /* logging to the plog */	
++    if (rp->plog_pid != INT_MIN) {
++        struct plog_entry entry = {rp->plog_pid, get_uptime(), PROC_READY, PROC_RUNNING, true};
++        plog_add_entry(entry);
++    }
++    return rp;
+   }
+   return NULL;
+ }
+@@ -1788,6 +1825,10 @@ static void notify_scheduler(struct proc *p)
+ 
+ 	/* dequeue the process */
+ 	RTS_SET(p, RTS_NO_QUANTUM);
++    if (p->plog_pid != INT_MIN) {
++        struct plog_entry entry = {p->plog_pid, get_uptime(), PROC_READY, PROC_RUNNING, true};
++        plog_add_entry(entry);
++    }
+ 	/*
+ 	 * Notify the process's scheduler that it has run out of
+ 	 * quantum. This is done by sending a message to the scheduler
+@@ -1888,3 +1929,47 @@ void release_fpu(struct proc * p) {
+ 	if (*fpu_owner_ptr == p)
+ 		*fpu_owner_ptr = NULL;
+ }
++
++/* plog functions */
++char * fmt_proc_state(enum proc_state state) {
++    if (state == PROC_READY) {
++        return "READY";
++    } else if (state == PROC_RUNNING) {
++        return "RUNNING";
++    } else if (state == PROC_BLOCKED) {
++        return "BLOCKED";
++    } else if (state == PROC_TERMINATED) {
++       return "TERMINATED";
++    } else if (state == PROC_NEW) {
++       return "NEW"; 
++    } else {
++        return "UNKOWN";
++    }   
++}
++
++void print_plog(void) {
++    //int i = plog.reader_index;
++    //for (;;) {
++    //    struct plog_entry * entry = &(plog.buffer[i]);
++    //    if (!entry->occupied) break; // this slot is not occupied. Don't print.
++    //    char * from_state = fmt_proc_state(entry->from);
++    //    char * to_state = fmt_proc_state(entry->to);
++    //    printf("PID%d\t%ld\t%s\t%s\n",entry->proc_pid, entry->time_stamp, from_state, to_state);
++    //    entry->occupied = false; // now that we printed it, mark it as free
++    //    i = (i < PLOG_BUFFER_SIZE - 1)? i + 1 : 0;
++    //}
++    //plog.reader_index = i;
++    for (int i = 0; i < PLOG_BUFFER_SIZE; i++) {
++        struct plog_entry * entry = &(plog.buffer[i]);
++        if (!entry->occupied) break; // this slot is not occupied. Don't print.
++        char * from_state = fmt_proc_state(entry->from);
++        char * to_state = fmt_proc_state(entry->to);
++        printf("PID%d\t%ld\t%s\t%s\n",entry->proc_pid, entry->time_stamp, from_state, to_state);
++    }
++}
++
++void plog_add_entry(struct plog_entry entry) {
++    int index = plog.writer_index;
++    plog.buffer[index] = entry;
++    plog.writer_index = (index < PLOG_BUFFER_SIZE - 1)? index + 1 : 0;  
++}
+diff --git a/kernel/proc.h b/kernel/proc.h
+index 4393969..416069d 100644
+--- a/kernel/proc.h
++++ b/kernel/proc.h
+@@ -3,7 +3,7 @@
+ 
+ #include <minix/const.h>
+ #include <sys/cdefs.h>
+-
++#include <stdbool.h>
+ #ifndef __ASSEMBLY__
+ 
+ /* Here is the declaration of the process table.  It contains all process
+@@ -120,7 +120,7 @@ struct proc {
+ 
+   int p_found;	/* consistency checking variables */
+   int p_magic;		/* check validity of proc pointers */
+-
++  int plog_pid;     /* pid that is needed for process state transition */
+   /* if MF_SC_DEFER is set, this struct is valid and contains the
+    * do_ipc() arguments that are still to be executed
+    */
+@@ -278,6 +278,27 @@ EXTERN struct proc proc[NR_TASKS + NR_PROCS];	/* process table */
+ int mini_send(struct proc *caller_ptr, endpoint_t dst_e, message *m_ptr,
+ 	int flags);
+ 
++
++/* ~~~~~~~~~~~~~~~~~~~~~~~  plog functionality ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ */
++enum proc_state {PROC_NONE = 0,  PROC_READY = 1, PROC_RUNNING = 2, PROC_BLOCKED = 3, PROC_TERMINATED = 4, PROC_NEW = 5};
++
++#define PLOG_BUFFER_SIZE 23
++struct {
++    int writer_index;
++    int reader_index;
++    struct plog_entry {
++        int proc_pid; 
++        long time_stamp; 
++        enum proc_state from; 
++        enum proc_state to;
++        bool occupied;          // this slot is occupied by data we haven't printed yet
++    } buffer[PLOG_BUFFER_SIZE];
++} plog;
++
++char * fmt_proc_state(enum proc_state state);
++void print_plog(void);
++void plog_add_entry(struct plog_entry entry);
++
+ #endif /* __ASSEMBLY__ */
+ 
+ #endif /* PROC_H */
+diff --git a/kernel/system.c b/kernel/system.c
+index e8fe038..83300f9 100644
+--- a/kernel/system.c
++++ b/kernel/system.c
+@@ -262,6 +262,8 @@ void system_init(void)
+   map(SYS_SCHEDULE, do_schedule);	/* reschedule a process */
+   map(SYS_SCHEDCTL, do_schedctl);	/* change process scheduler */
+ 
++  /* plog */
++  map(SYS_PLOG, do_plog);
+ }
+ /*===========================================================================*
+  *				get_priv				     *
+diff --git a/kernel/system.h b/kernel/system.h
+index fa58823..e4145ee 100644
+--- a/kernel/system.h
++++ b/kernel/system.h
+@@ -207,5 +207,7 @@ int do_statectl(struct proc * caller, message *m_ptr);
+ #define do_statectl NULL
+ #endif
+ 
++int do_plog(struct proc *caller, message *m_ptr);
++
+ #endif	/* SYSTEM_H */
+ 
+diff --git a/kernel/system/Makefile.inc b/kernel/system/Makefile.inc
+index 69efe4e..2a27c65 100644
+--- a/kernel/system/Makefile.inc
++++ b/kernel/system/Makefile.inc
+@@ -37,7 +37,8 @@ SRCS+= 	\
+ 	do_vmctl.c \
+ 	do_schedule.c \
+ 	do_schedctl.c \
+-	do_statectl.c
++	do_statectl.c \
++    do_plog.c
+ 
+ .if ${MACHINE_ARCH} == "i386"
+ SRCS+=  \
+diff --git a/kernel/system/do_plog.c b/kernel/system/do_plog.c
+new file mode 100644
+index 0000000..0a981d6
+--- /dev/null
++++ b/kernel/system/do_plog.c
+@@ -0,0 +1,35 @@
++// one of those allows us to use printf?
++#include "kernel/system.h"
++#include <minix/endpoint.h>
++
++#include <string.h>
++#include <stdbool.h>
++#include <stdlib.h>
++#include <unistd.h>
++#include <limits.h>
++#include <minix/type.h>
++
++
++int do_plog(struct proc *caller_ptr, message *m_ptr) {
++    int pid = m_ptr->m1_i1;
++    int proc_index = m_ptr->m1_i2;
++    bool enabled = m_ptr->m1_i3;
++    if (pid == INT_MIN && proc_index == INT_MIN) { // serve request to print plog_pid
++        printf("PROCESS\tTIME\tFROM\tTO\n");
++        for (int i = 0; i < PLOG_BUFFER_SIZE; i++) {
++            struct plog_entry * entry = &(plog.buffer[i]);
++            char * from_state = fmt_proc_state(entry->from);
++            char * to_state = fmt_proc_state(entry->to);
++            if (entry->from != PROC_NONE && entry->to != PROC_NONE) {
++                printf("PID%d\t%ld\t%s\t%s\n",entry->proc_pid, entry->time_stamp, from_state, to_state);
++            } else {
++                printf("--\t--\t--\t--\n");
++            }
++        }  
++        return(OK);
++    }
++    struct proc * entry = proc_addr(proc_index);
++    entry->plog_pid = (enabled) ? pid : INT_MIN;
++    printf("kernel do_plog: name: %s pid: %d enabled %d\n", entry->p_name, pid, enabled);
++    return(OK);
++}
+diff --git a/lib/libc/sys-minix/Makefile.inc b/lib/libc/sys-minix/Makefile.inc
+index 6f52097..0dc18d3 100644
+--- a/lib/libc/sys-minix/Makefile.inc
++++ b/lib/libc/sys-minix/Makefile.inc
+@@ -16,7 +16,7 @@ SRCS+= 	accept.c access.c bind.c brk.c sbrk.c m_closefrom.c getsid.c \
+ 	vectorio.c shutdown.c sigaction.c sigpending.c sigreturn.c sigsuspend.c\
+ 	sigprocmask.c socket.c socketpair.c stat.c statvfs.c symlink.c \
+ 	sync.c syscall.c sysuname.c truncate.c umask.c unlink.c write.c \
+-	_exit.c _ucontext.c environ.c __getcwd.c vfork.c sizeup.c init.c
++	_exit.c _ucontext.c environ.c __getcwd.c vfork.c sizeup.c init.c plog.c
+ 
+ # Minix specific syscalls.
+ SRCS+= cprofile.c lseek64.c sprofile.c _mcontext.c
+diff --git a/lib/libc/sys-minix/plog.c b/lib/libc/sys-minix/plog.c
+new file mode 100644
+index 0000000..c3a4922
+--- /dev/null
++++ b/lib/libc/sys-minix/plog.c
+@@ -0,0 +1,26 @@
++#include <lib.h>    // _syscall & message
++#include <unistd.h> // plog function prototypes
++
++#define plog_cmd    m2_i1
++#define plog_pid    m2_i2
++
++enum {STOP_PLOG = 0, START_PLOG = 1, PRINT_PLOG = 2};
++
++int plog_state_start(int PID) {
++    message m;
++    m.plog_cmd = START_PLOG;
++    m.plog_pid = PID;
++    return _syscall(PM_PROC_NR, PLOG, &m);
++}
++
++int plog_state_stop(int PID) {
++    message m;
++    m.plog_cmd = STOP_PLOG;
++    m.plog_pid = PID;
++    return _syscall(PM_PROC_NR, PLOG, &m);
++}
++int plog_print_transitions(void) {
++    message m;
++    m.plog_cmd = PRINT_PLOG;
++    return _syscall(PM_PROC_NR, PLOG, &m);
++}
+diff --git a/lib/libsys/Makefile b/lib/libsys/Makefile
+index 47343cc..14b7111 100644
+--- a/lib/libsys/Makefile
++++ b/lib/libsys/Makefile
+@@ -74,6 +74,7 @@ SRCS+=  \
+ 	sys_vsafecopy.c \
+ 	sys_vtimer.c \
+ 	sys_vumap.c \
++	sys_plog.c \
+ 	taskcall.c \
+ 	tickdelay.c \
+ 	timers.c \
+diff --git a/lib/libsys/sys_plog.c b/lib/libsys/sys_plog.c
+new file mode 100644
+index 0000000..787a866
+--- /dev/null
++++ b/lib/libsys/sys_plog.c
+@@ -0,0 +1,10 @@
++#include "syslib.h"
++#include "stdbool.h"
++
++int sys_plog(pid_t proc_pid, int proc_index, bool enabled) {
++    message m;
++    m.m1_i1 = proc_pid;
++    m.m1_i2 = proc_index;
++    m.m1_i3 = enabled;
++    return(_kernel_call(SYS_PLOG, &m));
++}
+diff --git a/man/man2/Makefile b/man/man2/Makefile
+index 44f54ab..657b021 100644
+--- a/man/man2/Makefile
++++ b/man/man2/Makefile
+@@ -9,7 +9,8 @@ MAN=	accept.2 access.2 alarm.2 bind.2 brk.2 chdir.2 chmod.2 chown.2 \
+ 	setsockopt.2 setuid.2 shutdown.2 sigaction.2 sigpending.2 \
+ 	sigprocmask.2 sigsuspend.2 socket.2 socketpair.2 \
+ 	statvfs.2 svrctl.2 symlink.2 sync.2 time.2 times.2 truncate.2 \
+-	umask.2 uname.2 unlink.2 utime.2 wait.2 write.2
++	umask.2 uname.2 unlink.2 utime.2 wait.2 write.2 plog_state_start.2 \
++	plog_state_stop.2
+ 
+ MLINKS += select.2 FD_CLR.2
+ MLINKS += select.2 FD_ISSET.2
+diff --git a/man/man2/plog_state_start.2 b/man/man2/plog_state_start.2
+new file mode 100644
+index 0000000..dc0c287
+--- /dev/null
++++ b/man/man2/plog_state_start.2
+@@ -0,0 +1,19 @@
++.\" Plog documentation
++.TH Plog 2
++.UC
++.SH NAME
++Plog \- plog_state_start, plog_state_stop - process transition tracking ultility
++.SH SYNOPSIS
++#include <unistd.h>
++
++int plog_state_start(int PID);
++int plog_state_stop(int PID);
++
++.SH DESCRIPTION
++The utility allows the user to obtain information about the transitions a process performs during its execution. Once enabled, the log will appear on the screen. Both functions accept a PID. a daemon process can constantly log for the system transitions. So as long as the daemon is enabled, the transitions are logged properly. A PID of 0 will start/stop state transistion logging for all normal user processes.  The return value shall indicate success (0), PID not found (1), invalid PID (2) (for when this tracing is requested for non-user processes), file error (3).
++.SH OPTIONS
++No options for these functions
++.SH BUGS            
++No known bugs have been reported.
++.SH AUTHOR    
++Benjamin Babtsov (ben.babtsov@ufl.edu)
+diff --git a/man/man2/plog_state_stop.2 b/man/man2/plog_state_stop.2
+new file mode 100644
+index 0000000..dc0c287
+--- /dev/null
++++ b/man/man2/plog_state_stop.2
+@@ -0,0 +1,19 @@
++.\" Plog documentation
++.TH Plog 2
++.UC
++.SH NAME
++Plog \- plog_state_start, plog_state_stop - process transition tracking ultility
++.SH SYNOPSIS
++#include <unistd.h>
++
++int plog_state_start(int PID);
++int plog_state_stop(int PID);
++
++.SH DESCRIPTION
++The utility allows the user to obtain information about the transitions a process performs during its execution. Once enabled, the log will appear on the screen. Both functions accept a PID. a daemon process can constantly log for the system transitions. So as long as the daemon is enabled, the transitions are logged properly. A PID of 0 will start/stop state transistion logging for all normal user processes.  The return value shall indicate success (0), PID not found (1), invalid PID (2) (for when this tracing is requested for non-user processes), file error (3).
++.SH OPTIONS
++No options for these functions
++.SH BUGS            
++No known bugs have been reported.
++.SH AUTHOR    
++Benjamin Babtsov (ben.babtsov@ufl.edu)
+diff --git a/project2/plog_control.c b/project2/plog_control.c
+new file mode 100644
+index 0000000..5c237a0
+--- /dev/null
++++ b/project2/plog_control.c
+@@ -0,0 +1,15 @@
++#include <stdlib.h>
++#include <unistd.h>
++
++int main(int argc, char** argv) {
++    if (argc != 3)
++        return 1;
++    int enabled = atoi(argv[1]);
++    int pid = atoi(argv[2]);
++    
++    if (enabled)
++        plog_state_start(pid);
++    else
++        plog_state_stop(pid);
++    return 0;
++}
+diff --git a/project2/show.c b/project2/show.c
+new file mode 100644
+index 0000000..0161eaa
+--- /dev/null
++++ b/project2/show.c
+@@ -0,0 +1,7 @@
++#include <stdlib.h>
++#include <unistd.h>
++
++int main(int argc, char** argv) {
++        plog_print_transitions();
++    return 0;
++}
+diff --git a/servers/pm/Makefile b/servers/pm/Makefile
+index 9065432..9c0d155 100644
+--- a/servers/pm/Makefile
++++ b/servers/pm/Makefile
+@@ -4,7 +4,7 @@
+ PROG=	pm
+ SRCS=	main.c forkexit.c break.c exec.c time.c alarm.c \
+ 	signal.c utility.c table.c getset.c misc.c \
+-	profile.c schedule.c
++	profile.c schedule.c plog.c
+ 
+ .if ${USE_MCONTEXT} != "no"
+ SRCS+= mcontext.c
+diff --git a/servers/pm/plog.c b/servers/pm/plog.c
+new file mode 100644
+index 0000000..3375c57
+--- /dev/null
++++ b/servers/pm/plog.c
+@@ -0,0 +1,52 @@
++#include <stdio.h>
++#include <string.h>
++#include <sys/types.h>
++#include <stdbool.h>
++#include "pm.h"
++#include "mproc.h"
++
++#define plog_cmd    m2_i1 
++#define plog_pid    m2_i2
++
++enum {STOP_PLOG = 0, START_PLOG = 1, PRINT_PLOG = 2};
++
++static int find_proc_slot(int req_pid) {
++    int proc_index = -1;
++    for (int i = 0; i < NR_PROCS - 1; i++) {
++        if (mproc[i].mp_pid == req_pid) {
++            proc_index = i;
++            break;
++        }
++    }
++    if (proc_index != -1) 
++        printf("PM: proc name: %s\n",mproc[proc_index].mp_name);
++    else
++        printf("PM proc name not found\n");
++    return proc_index;
++}
++
++int do_plog(void) {
++    int command = m_in.plog_cmd;
++    int req_pid = m_in.plog_pid;
++    int proc_index;
++    switch (command) {
++        case START_PLOG:
++            printf("PM: START_PLOG. pid: %d\n", req_pid);
++            proc_index = find_proc_slot(req_pid);
++            if (proc_index == -1 ) return 1;
++            sys_plog(req_pid, proc_index, true);
++            return 0;
++
++        case STOP_PLOG:
++            printf("PM: STOP_PLOG. pid: %d\n", req_pid);
++            proc_index = find_proc_slot(req_pid);
++            if (proc_index == -1 ) return 1;
++            sys_plog(req_pid, proc_index, false);
++            return 0;
++
++        case PRINT_PLOG:
++            sys_plog(INT_MIN, INT_MIN, false);
++            return 0;
++    } 
++    return -1;
++}
+diff --git a/servers/pm/proto.h b/servers/pm/proto.h
+index 00646d3..1141438 100644
+--- a/servers/pm/proto.h
++++ b/servers/pm/proto.h
+@@ -103,3 +103,6 @@ struct mproc *find_proc(pid_t lpid);
+ int nice_to_priority(int nice, unsigned *new_q);
+ int pm_isokendpt(int ep, int *proc);
+ void tell_vfs(struct mproc *rmp, message *m_ptr);
++
++/* plog.c */
++int do_plog(void);
+diff --git a/servers/pm/table.c b/servers/pm/table.c
+index 5051cec..804324e 100644
+--- a/servers/pm/table.c
++++ b/servers/pm/table.c
+@@ -80,7 +80,7 @@ int (*call_vec[])(void) = {
+ 	do_set, 	/* 66 = setgroups */
+ 	do_getmcontext,	/* 67 = getmcontext */
+ 	do_setmcontext,	/* 68 = setmcontext */
+-	no_sys,		/* 69 = unused	*/
++	do_plog,		/* 69 = plog	*/
+ 	no_sys,		/* 70 = unused	*/
+ 	do_sigaction,	/* 71 = sigaction   */
+ 	do_sigsuspend,	/* 72 = sigsuspend  */
