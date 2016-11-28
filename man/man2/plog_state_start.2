@@ -1,0 +1,19 @@
+.\" Plog documentation
+.TH Plog 2
+.UC
+.SH NAME
+Plog \- plog_state_start, plog_state_stop - process transition tracking ultility
+.SH SYNOPSIS
+#include <unistd.h>
+
+int plog_state_start(int PID);
+int plog_state_stop(int PID);
+
+.SH DESCRIPTION
+The system library calls allow a user process to turn on and turn off state tracing for a process. Both functions accept a pid. A PID of 0 will start/stop state transistion logging for all normal user processes.  The return value shall indicate success (0), PID not found (1), invalid PID (2) (for when this tracing is requested for non-user processes), file error (3). Tracing stops when a process is terminated, but the file is not deleted or otherwise modified, other than indicating the process terminated.
+.SH OPTIONS
+No options for these functions
+.SH BUGS            
+No known bugs have been reported.
+.SH AUTHOR    
+Luis Pino (lpino2662@ufl.edu)
