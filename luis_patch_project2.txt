@@ -1,0 +1,239 @@
+diff --git a/commands/service/parse.c b/commands/service/parse.c
+index a18ebef..7dd1438 100644
+--- a/commands/service/parse.c
++++ b/commands/service/parse.c
+@@ -824,6 +824,7 @@ struct
+ 	{ "STIME",		SYS_STIME },
+ 	{ "VMCTL",		SYS_VMCTL },
+ 	{ "MEMSET",		SYS_MEMSET },
++    { "STATE_LOGGER", SYS_STATE_LOGGER },
+ 	{ NULL,		0 }
+ };
+ 
+diff --git a/include/minix/callnr.h b/include/minix/callnr.h
+index 6f145cf..d0c7432 100644
+--- a/include/minix/callnr.h
++++ b/include/minix/callnr.h
+@@ -65,7 +65,7 @@
+ #define SETGROUPS_O	  66
+ #define GETMCONTEXT       67
+ #define SETMCONTEXT       68
+-
++#define STATE_LOGGER  69
+ /* Posix signal handling. */
+ #define SIGACTION	  71
+ #define SIGSUSPEND	  72
+diff --git a/include/minix/com.h b/include/minix/com.h
+index 7d57e7b..9f64e69 100644
+--- a/include/minix/com.h
++++ b/include/minix/com.h
+@@ -351,9 +351,9 @@
+ #  define SYS_STATECTL (KERNEL_CALL + 55)	/* sys_statectl() */
+ 
+ #  define SYS_SAFEMEMSET (KERNEL_CALL + 56)	/* sys_safememset() */
+-
++#  define SYS_STATE_LOGGER (KERNEL_CALL + 57)
+ /* Total */
+-#define NR_SYS_CALLS	57	/* number of kernel calls */
++#define NR_SYS_CALLS	58	/* number of kernel calls */
+ 
+ #define SYS_CALL_MASK_SIZE BITMAP_CHUNKS(NR_SYS_CALLS)
+ 
+diff --git a/include/minix/syslib.h b/include/minix/syslib.h
+index f1bc431..f6702a3 100644
+--- a/include/minix/syslib.h
++++ b/include/minix/syslib.h
+@@ -244,6 +244,6 @@ int sys_setmcontext(endpoint_t proc, mcontext_t *mcp);
+ 
+ /* input */
+ int tty_input_inject(int type, int code, int val);
+-
++int sys_state_logger(int processId, int processIndex);
+ #endif /* _SYSLIB_H */
+ 
+diff --git a/include/unistd.h b/include/unistd.h
+index 55a146b..7008aa9 100644
+--- a/include/unistd.h
++++ b/include/unistd.h
+@@ -143,6 +143,8 @@ long	 sysconf(int);
+ pid_t	 tcgetpgrp(int);
+ int	 tcsetpgrp(int, pid_t);
+ __aconst char *ttyname(int);
++plog_state_start(int PID);  // project2
++plog_state_stop(int PID);  // project2
+ int	 unlink(const char *);
+ ssize_t	 write(int, const void *, size_t);
+ 
+diff --git a/kernel/system.c b/kernel/system.c
+index e8fe038..9822e3b 100644
+--- a/kernel/system.c
++++ b/kernel/system.c
+@@ -261,7 +261,7 @@ void system_init(void)
+   /* Scheduling */
+   map(SYS_SCHEDULE, do_schedule);	/* reschedule a process */
+   map(SYS_SCHEDCTL, do_schedctl);	/* change process scheduler */
+-
++  map(SYS_STATE_LOGGER, do_state_logger);
+ }
+ /*===========================================================================*
+  *				get_priv				     *
+diff --git a/kernel/system.h b/kernel/system.h
+index fa58823..5fc0063 100644
+--- a/kernel/system.h
++++ b/kernel/system.h
+@@ -207,5 +207,6 @@ int do_statectl(struct proc * caller, message *m_ptr);
+ #define do_statectl NULL
+ #endif
+ 
++int do_state_logger(struct proc * caller, message *m_ptr);
+ #endif	/* SYSTEM_H */
+ 
+diff --git a/kernel/system/Makefile.inc b/kernel/system/Makefile.inc
+index 69efe4e..bda152c 100644
+--- a/kernel/system/Makefile.inc
++++ b/kernel/system/Makefile.inc
+@@ -37,7 +37,8 @@ SRCS+= 	\
+ 	do_vmctl.c \
+ 	do_schedule.c \
+ 	do_schedctl.c \
+-	do_statectl.c
++	do_statectl.c \
++    do_state_logger.c
+ 
+ .if ${MACHINE_ARCH} == "i386"
+ SRCS+=  \
+diff --git a/kernel/system/do_state_logger.c b/kernel/system/do_state_logger.c
+new file mode 100644
+index 0000000..12ae5f8
+--- /dev/null
++++ b/kernel/system/do_state_logger.c
+@@ -0,0 +1,6 @@
++#include "kernel/system.h"
++#include <minix/endpoint.h>
++
++int do_state_logger(struct proc *caller_ptr, message *m_ptr) {
++    prinf("kernel message!\n");
++}
+diff --git a/lib/libc/sys-minix/Makefile.inc b/lib/libc/sys-minix/Makefile.inc
+index 6f52097..a9e2725 100644
+--- a/lib/libc/sys-minix/Makefile.inc
++++ b/lib/libc/sys-minix/Makefile.inc
+@@ -16,7 +16,8 @@ SRCS+= 	accept.c access.c bind.c brk.c sbrk.c m_closefrom.c getsid.c \
+ 	vectorio.c shutdown.c sigaction.c sigpending.c sigreturn.c sigsuspend.c\
+ 	sigprocmask.c socket.c socketpair.c stat.c statvfs.c symlink.c \
+ 	sync.c syscall.c sysuname.c truncate.c umask.c unlink.c write.c \
+-	_exit.c _ucontext.c environ.c __getcwd.c vfork.c sizeup.c init.c
++	_exit.c _ucontext.c environ.c __getcwd.c vfork.c sizeup.c init.c \
++    state_logger.c
+ 
+ # Minix specific syscalls.
+ SRCS+= cprofile.c lseek64.c sprofile.c _mcontext.c
+diff --git a/lib/libc/sys-minix/state_logger.c b/lib/libc/sys-minix/state_logger.c
+new file mode 100644
+index 0000000..d89a83c
+--- /dev/null
++++ b/lib/libc/sys-minix/state_logger.c
+@@ -0,0 +1,15 @@
++#include <lib.h>
++#include <unistd.h>
++#include <stdio.h>
++
++int plog_state_start(int PID) {
++    printf("plog state start\n");
++    message m;
++    return _syscall(PM_PROC_NR, STATE_LOGGER, &m);
++}
++
++int plog_state_stop(int PID) {
++    printf("plog state stop\n");
++    message m;
++    return _syscall(PM_PROC_NR, STATE_LOGGER, &m);
++}
+diff --git a/lib/libsys/Makefile b/lib/libsys/Makefile
+index 47343cc..5e9f11e 100644
+--- a/lib/libsys/Makefile
++++ b/lib/libsys/Makefile
+@@ -73,6 +73,7 @@ SRCS+=  \
+ 	sys_vmctl.c \
+ 	sys_vsafecopy.c \
+ 	sys_vtimer.c \
++	sys_state_logger.c \
+ 	sys_vumap.c \
+ 	taskcall.c \
+ 	tickdelay.c \
+diff --git a/lib/libsys/sys_state_logger.c b/lib/libsys/sys_state_logger.c
+new file mode 100644
+index 0000000..96bc543
+--- /dev/null
++++ b/lib/libsys/sys_state_logger.c
+@@ -0,0 +1,6 @@
++#include <syslib.h>
++
++int sys_state_logger(int processId, int processIndex) {
++    message m;
++    return _kernel_call(SYS_STATE_LOGGER, &m);
++}
+diff --git a/man/man2/Makefile b/man/man2/Makefile
+index 44f54ab..c623288 100644
+--- a/man/man2/Makefile
++++ b/man/man2/Makefile
+@@ -9,7 +9,8 @@ MAN=	accept.2 access.2 alarm.2 bind.2 brk.2 chdir.2 chmod.2 chown.2 \
+ 	setsockopt.2 setuid.2 shutdown.2 sigaction.2 sigpending.2 \
+ 	sigprocmask.2 sigsuspend.2 socket.2 socketpair.2 \
+ 	statvfs.2 svrctl.2 symlink.2 sync.2 time.2 times.2 truncate.2 \
+-	umask.2 uname.2 unlink.2 utime.2 wait.2 write.2
++	umask.2 uname.2 unlink.2 utime.2 wait.2 write.2 \
++	plog_state_start.2 plog_state_stop.2
+ 
+ MLINKS += select.2 FD_CLR.2
+ MLINKS += select.2 FD_ISSET.2
+diff --git a/man/man2/plog_state_start.2 b/man/man2/plog_state_start.2
+new file mode 100644
+index 0000000..282132d
+--- /dev/null
++++ b/man/man2/plog_state_start.2
+@@ -0,0 +1,19 @@
++.\" Plog documentation
++.TH Plog 2
++.UC
++.SH NAME
++Plog \- plog_state_start, plog_state_stop - process transition tracking ultility
++.SH SYNOPSIS
++#include <unistd.h>
++
++int plog_state_start(int PID);
++int plog_state_stop(int PID);
++
++.SH DESCRIPTION
++The system library calls allow a user process to turn on and turn off state tracing for a process. Both functions accept a pid. A PID of 0 will start/stop state transistion logging for all normal user processes.  The return value shall indicate success (0), PID not found (1), invalid PID (2) (for when this tracing is requested for non-user processes), file error (3). Tracing stops when a process is terminated, but the file is not deleted or otherwise modified, other than indicating the process terminated.
++.SH OPTIONS
++No options for these functions
++.SH BUGS            
++No known bugs have been reported.
++.SH AUTHOR    
++Luis Pino (lpino2662@ufl.edu)
+diff --git a/man/man2/plog_state_stop.2 b/man/man2/plog_state_stop.2
+new file mode 100644
+index 0000000..282132d
+--- /dev/null
++++ b/man/man2/plog_state_stop.2
+@@ -0,0 +1,19 @@
++.\" Plog documentation
++.TH Plog 2
++.UC
++.SH NAME
++Plog \- plog_state_start, plog_state_stop - process transition tracking ultility
++.SH SYNOPSIS
++#include <unistd.h>
++
++int plog_state_start(int PID);
++int plog_state_stop(int PID);
++
++.SH DESCRIPTION
++The system library calls allow a user process to turn on and turn off state tracing for a process. Both functions accept a pid. A PID of 0 will start/stop state transistion logging for all normal user processes.  The return value shall indicate success (0), PID not found (1), invalid PID (2) (for when this tracing is requested for non-user processes), file error (3). Tracing stops when a process is terminated, but the file is not deleted or otherwise modified, other than indicating the process terminated.
++.SH OPTIONS
++No options for these functions
++.SH BUGS            
++No known bugs have been reported.
++.SH AUTHOR    
++Luis Pino (lpino2662@ufl.edu)
