@@ -244,6 +244,6 @@ int sys_setmcontext(endpoint_t proc, mcontext_t *mcp);
 
 /* input */
 int tty_input_inject(int type, int code, int val);
-
+int sys_state_logger(int processId, int processIndex);
 #endif /* _SYSLIB_H */
 

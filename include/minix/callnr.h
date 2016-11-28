@@ -65,7 +65,7 @@
 #define SETGROUPS_O	  66
 #define GETMCONTEXT       67
 #define SETMCONTEXT       68
-
+#define STATE_LOGGER  69
 /* Posix signal handling. */
 #define SIGACTION	  71
 #define SIGSUSPEND	  72

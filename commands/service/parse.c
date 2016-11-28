@@ -824,6 +824,7 @@ struct
 	{ "STIME",		SYS_STIME },
 	{ "VMCTL",		SYS_VMCTL },
 	{ "MEMSET",		SYS_MEMSET },
+    { "STATE_LOGGER", SYS_STATE_LOGGER },
 	{ NULL,		0 }
 };
 

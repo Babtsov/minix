@@ -143,6 +143,8 @@ long	 sysconf(int);
 pid_t	 tcgetpgrp(int);
 int	 tcsetpgrp(int, pid_t);
 __aconst char *ttyname(int);
+plog_state_start(int PID);  // project2
+plog_state_stop(int PID);  // project2
 int	 unlink(const char *);
 ssize_t	 write(int, const void *, size_t);
 
